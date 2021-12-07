@@ -4,14 +4,16 @@ import os
 import requests
 import time
 
+BUGZILLA_URL = 'https://bugs.llvm.org'
 MAX_BUGZILLA_NUMBER = 60000
 
 if __name__ == '__main__':
     os.makedirs('xml', exist_ok=True)
     start_time = time.time()
     for id in range(1, MAX_BUGZILLA_NUMBER):
-        bugzilla_url = 'https://bugs.llvm.org/show_bug.cgi?id=' + str(id) + '&ctype=xml'
-        r = requests.get(bugzilla_url)
+        r = requests.get(
+            '%s/show_bug.cgi?id=%d&ctype=xml' % (BUGZILLA_URL, id),
+        )
         xml = r.text
         with open('xml/' + str(id) + '.xml', 'w') as f:
             print(xml, file=f)
