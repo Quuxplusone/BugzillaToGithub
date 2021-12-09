@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import datetime
+import dateutil.parser
 import glob
 import json
 import os
@@ -77,6 +79,18 @@ def link_to_commit_if_possible(s):
     return s
 
 
+def reformat_timestamp(t):
+    # GitHub is very picky about its timestamp formats.
+    assert re.match(r'\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d\d00', t), 'Unexpected timestamp %s' % t
+    t = t[:19] + t[20:]  # remove the space
+    dt = dateutil.parser.isoparse(t)
+    result = dt.astimezone(datetime.timezone.utc).isoformat()
+    assert result.endswith('+00:00'), 'Unexpected timestamp %s formatted to %s' % (t, result)
+    result = result[:-6] + 'Z'
+    assert re.match(r'\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ', result), 'Unexpected timestamp %s formatted to %s' % (t, result)
+    return result
+
+
 def repeated_element(bz, key):
     # Handle the fact that xmltodict turns "<a>1</a>" into {"a": "1"},
     # but "<a>1</a><a>2</a>" becomes {"a": ["1","2"]}.
@@ -135,6 +149,7 @@ def generate_summary_table(bz):
         fixed_by_commits = ''
 
     summary = '\n'.join([
+        '|                    |    |',
         '|--------------------|----|',
         '| Bugzilla Link      | %s |',
         '| Status             | %s |',
@@ -170,8 +185,8 @@ def generate_summary_table(bz):
 def to_github_comment(c):
     return {
         "user": to_github_userblob(c['who']),
-        "created_at": c['bug_when'],
-        "updated_at": c['bug_when'],
+        "created_at": reformat_timestamp(c['bug_when']),
+        "updated_at": reformat_timestamp(c['bug_when']),
         "body": markdownify(c['thetext'] or ''),
     }
 
@@ -187,8 +202,8 @@ def to_human_readable_attachment(a):
 def to_github_attachment_comment(a):
     return {
         "user": to_github_userblob(a['attacher']),
-        "created_at": a['date'],
-        "updated_at": a['delta_ts'],
+        "created_at": reformat_timestamp(a['date']),
+        "updated_at": reformat_timestamp(a['delta_ts']),
         "body": "Attached %s: %s" % (to_human_readable_attachment(a), markdownify(a['desc'] or '')),
     }
 
@@ -225,8 +240,8 @@ def bugzilla_to_github(id, bz):
                 to_github_userblob(bz['assigned_to'])
             ],
             "comments": len(comments),
-            "created_at": bz['creation_ts'],
-            "updated_at": bz['delta_ts'],
+            "created_at": reformat_timestamp(bz['creation_ts']),
+            "updated_at": reformat_timestamp(bz['delta_ts']),
             "closed_at": None,
             "body": generate_summary_table(bz) + '\n\n\n' + markdownify(repeated_element(bz, 'long_desc')[0]['thetext'] or ''),
         },
