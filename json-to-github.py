@@ -19,7 +19,7 @@ import time
 GITHUB_REPOSITORY_NAME = 'Quuxplusone/ImportTest'
 GITHUB_API_TOKEN = os.environ['GITHUB_API_TOKEN']
 FIRST_BUGZILLA_ID = 1
-LAST_BUGZILLA_ID = 1000
+LAST_BUGZILLA_ID = 10000
 
 
 def submit_github_issue(payload):
@@ -51,12 +51,15 @@ def dumb_down_comment(c):
 
 def dumb_down_issue(gh):
     # https://gist.github.com/jonmagic/5282384165e0f86ef105#supported-issue-and-comment-fields
+    # Notice that if you don't set a "closed_at" timestamp, then GitHub will assume
+    # the issue got closed at the time of the API call, screwing up its last-modified time.
+    # Therefore, we explicitly backdate the "closed_at" time.
     return {
         "issue": {
             "title": gh['issue']['title'],
             "body": gh['issue']['body'],
             "created_at": gh['issue']['created_at'],
-            # "closed_at": None,
+            "closed_at": gh['issue']['updated_at'],
             "updated_at": gh['issue']['updated_at'],
             "assignee": bugzilla_to_github_user(gh['issue'].get('assignee', {}).get('login', None)),
             # "milestone": None,
