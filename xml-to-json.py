@@ -10,18 +10,88 @@ import time
 import xmltodict
 
 
-def link_to_svn_commit(svn_commit_id):
-    return '[rL%s](https://reviews.llvm.org/rL%s)' % (svn_commit_id, svn_commit_id)
+def link_to_original_bugzilla_bug(bugzilla_id, text=None):
+    assert type(bugzilla_id) is str
+    if text is None:
+        text = 'PR' + bugzilla_id
+    return '[%s](https://bugs.llvm.org/show_bug.cgi?id=%s)' % (text, bugzilla_id)
 
 
-def link_to_git_commit(git_commit_id):
-    return '[%s](https://reviews.llvm.org/rG%s)' % (git_commit_id, git_commit_id)
+def link_to_pr(bugzilla_id, text=None):
+    # TODO FIXME BUG HACK: This should go to something like https://reviews.llvm.org/PR1234 instead.
+    # which should then be an HTTP redirect to the correct GitHub issue.
+    return link_to_original_bugzilla_bug(bugzilla_id, text)
+
+
+def link_to_svn_commit(svn_commit_id, text=None):
+    if text is None:
+        text = 'rL' + svn_commit_id
+    return '[%s](https://reviews.llvm.org/rL%s)' % (text, svn_commit_id)
+
+
+def link_to_git_commit(git_commit_id, text=None):
+    if text is None:
+        text = 'rG' + git_commit_id
+    return '[%s](https://reviews.llvm.org/rG%s)' % (text, git_commit_id)
+
+
+def replace_all_in_string(text, rx, how):
+    rx = re.compile(rx)
+    pos = 0
+    while True:
+        m = rx.search(text, pos)
+        if m is None:
+            break
+        suffix = text[m.end(1):]
+        text = text[:m.start(1)] + how(m) + suffix
+        pos = len(text) - len(suffix)
+    return text
 
 
 def link_to_mentioned_bugs_and_commits(text):
-    # TODO FIXME BUG HACK: this is where we should deal with comments such as
+    # This is where we should deal with comments such as
     # "Duplicate of bug 21377" or "I reverted this in r254044 because PR25607."
-    # For now, don't bother with this.
+    # TODO FIXME BUG HACK: This could still be improved.
+    text = replace_all_in_string(
+        text,
+        r'\W(revision [0-9]{4,5})\W',
+        lambda m: link_to_svn_commit(m.group(1)[9:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'\W(commit [0-9a-f]{7,40})\W',
+        lambda m: link_to_git_commit(m.group(1)[7:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'\W([Bb]ug [0-9]{2,5})\W',
+        lambda m: link_to_pr(m.group(1)[4:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'uplicate of ([0-9]{2,5})\W',
+        lambda m: link_to_pr(m.group(1)[12:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'[^_A-Za-z0-9/](PR[0-9]{3,5})\W',
+        lambda m: link_to_pr(m.group(1)[2:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'[^_A-Za-z0-9/](rL[23][0-9]{5})\W',
+        lambda m: link_to_svn_commit(m.group(1)[2:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'[^_A-Za-z0-9/](r[23][0-9]{5})\W',
+        lambda m: link_to_svn_commit(m.group(1)[1:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'[^_A-Za-z0-9/](rG[0-9a-f]{7,40})\W',
+        lambda m: link_to_git_commit(m.group(1)[2:], m.group(1))
+    )
     return text
 
 
@@ -39,21 +109,16 @@ def markdownify(text):
     return link_to_mentioned_bugs_and_commits(text)
 
 
-def link_to_bug(id):
-    assert type(id) is int
-    return '[%d](https://bugs.llvm.org/show_bug.cgi?id=%d)' % (id, id)
-
-
-def link_to_bug_if_possible(s):
+def link_to_pr_if_possible(s):
     m = re.match(r'^([0-9]+)$', s)
     if m:
-        return link_to_bug(int(m.group(1)))
+        return link_to_pr(m.group(1))
     m = re.match(r'^PR([0-9]+)$', s)
     if m:
-        return link_to_bug(int(m.group(1)))
+        return link_to_pr(m.group(1))
     m = re.match(r'^https://bugs.llvm.org/show_bug.cgi?id=([0-9]+)$', s)
     if m:
-        return link_to_bug(int(m.group(1)))
+        return link_to_pr(m.group(1))
     return markdownify(s)
 
 
@@ -166,7 +231,7 @@ def generate_summary_table(bz):
         '| See also           | %s |',
     ])
     return summary % (
-        link_to_bug(int(bz['bug_id'])),
+        link_to_original_bugzilla_bug(bz['bug_id']),
         parse_bz_status(bz),
         '%s %s' % (bz['priority'], bz['bug_severity']),
         to_human_readable_userblob(bz['reporter']),
@@ -177,8 +242,8 @@ def generate_summary_table(bz):
         ', '.join(repeated_element(bz, 'cc')),
         fixed_by_commits,
         '<br/>'.join([to_human_readable_attachment(a) for a in repeated_element(bz, 'attachment')]),
-        ', '.join([link_to_bug_if_possible(s) for s in repeated_element(bz, 'blocked')]),
-        ', '.join([link_to_bug_if_possible(s) for s in repeated_element(bz, 'see_also')]),
+        ', '.join([link_to_pr_if_possible(s) for s in repeated_element(bz, 'blocked')]),
+        ', '.join([link_to_pr_if_possible(s) for s in repeated_element(bz, 'see_also')]),
     )
 
 
@@ -258,7 +323,7 @@ def extract_id(fname):
 if __name__ == '__main__':
     os.makedirs('json', exist_ok=True)
     all_xml_filenames = glob.glob('xml/*.xml')
-    all_bugzilla_ids = [extract_id(fname) for fname in all_xml_filenames]
+    all_bugzilla_ids = sorted([extract_id(fname) for fname in all_xml_filenames])
     start_time = time.time()
     processed = 0
     for id in all_bugzilla_ids:
