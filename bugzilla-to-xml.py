@@ -6,7 +6,7 @@ import time
 
 BUGZILLA_URL = 'https://bugs.llvm.org'
 FIRST_BUGZILLA_NUMBER = 1
-LAST_BUGZILLA_NUMBER = 60000
+LAST_BUGZILLA_NUMBER = 53000
 
 if __name__ == '__main__':
     os.makedirs('xml', exist_ok=True)
