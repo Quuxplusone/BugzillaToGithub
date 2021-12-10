@@ -213,10 +213,16 @@ def repeated_element(bz, key):
 def parse_bz_status(bz):
     status = bz['bug_status']
     resolution = bz['resolution']
-    if status not in ['NEW', 'CONFIRMED', 'REOPENED', 'RESOLVED']:
-        assert False, 'Unexpected status string %s' % status
+    valid_statuses = ['NEW', 'CONFIRMED', 'REOPENED', 'RESOLVED']
+    valid_resolutions = ['DUPLICATE', 'FIXED', 'INVALID', 'LATER', 'MOVED', 'REMIND', 'WONTFIX', 'WORKSFORME']
+    assert status in valid_statuses, 'Unexpected status string %s' % status
     if resolution is not None:
-        return status + ' ' + resolution
+        assert resolution in valid_resolutions, 'Unexpected resolution string %s' % resolution
+        assert status == 'RESOLVED'
+        if resolution == 'DUPLICATE':
+            return link_to_mentioned_bugs_and_commits('RESOLVED DUPLICATE of bug %d' % int(bz['dup_id']))
+        else:
+            return 'RESOLVED %s' % resolution
     else:
         return status
 
