@@ -54,43 +54,59 @@ def link_to_mentioned_bugs_and_commits(text):
     # TODO FIXME BUG HACK: This could still be improved.
     text = replace_all_in_string(
         text,
-        r'\W(revision [0-9]{4,5})\W',
+        r'\b(revision [0-9]{4,5})\b',
         lambda m: link_to_svn_commit(m.group(1)[9:], m.group(1))
     )
     text = replace_all_in_string(
         text,
-        r'\W(commit [0-9a-f]{7,40})\W',
+        r'\b(commit [0-9a-f]{7,40})\b',
         lambda m: link_to_git_commit(m.group(1)[7:], m.group(1))
     )
     text = replace_all_in_string(
         text,
-        r'\W([Bb]ug [0-9]{2,5})\W',
+        r'\b([Bb]ug [0-9]{2,5})\b',
         lambda m: link_to_pr(m.group(1)[4:], m.group(1))
     )
     text = replace_all_in_string(
         text,
-        r'uplicate of ([0-9]{2,5})\W',
+        r'uplicate of ([0-9]{2,5})\b',
         lambda m: link_to_pr(m.group(1)[12:], m.group(1))
     )
     text = replace_all_in_string(
         text,
-        r'[^_A-Za-z0-9/](PR[0-9]{3,5})\W',
+        r'[^_A-Za-z0-9/](PR[0-9]{3,5})\b',
         lambda m: link_to_pr(m.group(1)[2:], m.group(1))
     )
     text = replace_all_in_string(
         text,
-        r'[^_A-Za-z0-9/](rL[23][0-9]{5})\W',
+        r'[^_A-Za-z0-9/](rL[23][0-9]{5})\b',
         lambda m: link_to_svn_commit(m.group(1)[2:], m.group(1))
     )
     text = replace_all_in_string(
         text,
-        r'[^_A-Za-z0-9/](r[23][0-9]{5})\W',
+        r'[^_A-Za-z0-9/](r[23][0-9]{5})\b',
         lambda m: link_to_svn_commit(m.group(1)[1:], m.group(1))
     )
     text = replace_all_in_string(
         text,
-        r'[^_A-Za-z0-9/](rG[0-9a-f]{7,40})\W',
+        r'[^_A-Za-z0-9/](rG[0-9a-f]{7,40})\b',
         lambda m: link_to_git_commit(m.group(1)[2:], m.group(1))
+    )
+    return text
+
+
+def link_to_mentioned_bugs_in_bugzilla_autocomment(text):
+    # See detect_bugzilla_autocomment. The only kinds of autocomments
+    # we support are the ones where every integer is a bug number.
+    text = replace_all_in_string(
+        text,
+        r'\b([Bb]ug [0-9]{2,5})\b',
+        lambda m: link_to_pr(m.group(1)[4:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'uplicate of ([0-9]{2,5})\b',
+        lambda m: link_to_pr(m.group(1)[12:], m.group(1))
     )
     return text
 
@@ -247,12 +263,37 @@ def generate_summary_table(bz):
     )
 
 
+def detect_bugzilla_autocomment(text):
+    if not text.strip().endswith('***'):
+        return (text, '')
+    partition_point = None
+    m1 = re.search(r'\*\*\* This bug has been marked as a duplicate of bug \d+ \*\*\*', text)
+    m2 = re.search(r'\*\*\* This bug has been marked as a duplicate of \d+ \*\*\*', text)
+    m3 = re.search(r'\*\*\* Bug \d+ has been marked as a duplicate of this bug. \*\*\*', text)
+    assert not((m1 and m2) or (m1 and m3) or (m2 and m3))
+    if (m1 or m2 or m3):
+        partition_point = (m1 or m2 or m3).start(0)
+        autocomment = text[partition_point:].strip()
+        assert autocomment.startswith('*** ')
+        assert autocomment.endswith(' ***')
+        autocomment = '_%s_' % link_to_mentioned_bugs_in_bugzilla_autocomment(autocomment[4:-4].strip())
+        text = text[:partition_point].strip()
+        assert not text.endswith('***')
+        return (text, autocomment)
+    else:
+        return (text, '')
+
+
 def to_github_comment(c):
+    bodytext, autocomment = detect_bugzilla_autocomment(c['thetext'].strip() or '')
+    bodytext = markdownify(bodytext)
+    if bodytext and autocomment:
+        bodytext = bodytext.strip() + '\n\n'
     return {
         "user": to_github_userblob(c['who']),
         "created_at": reformat_timestamp(c['bug_when']),
         "updated_at": reformat_timestamp(c['bug_when']),
-        "body": markdownify(c['thetext'] or ''),
+        "body": bodytext + autocomment,
     }
 
 
@@ -274,10 +315,10 @@ def to_github_attachment_comment(a):
 
 
 def bugzilla_to_github(id, bz):
-    assert len(bz) == 1
-    bz = bz['bugzilla']
-    assert sorted(bz.keys()) == ['@maintainer', '@urlbase', '@version', 'bug']
-    bz = bz['bug']
+    # If you did Step 1 without valid Bugzilla credentials, '@exporter' will be missing.
+    assert sorted(bz.keys()) == ['bugzilla']
+    assert sorted(bz['bugzilla'].keys()) == ['@exporter', '@maintainer', '@urlbase', '@version', 'bug']
+    bz = bz['bugzilla']['bug']
     assert bz['bug_id'] == str(id)
     status = parse_bz_status(bz)
     tags = parse_bz_tags(bz)
