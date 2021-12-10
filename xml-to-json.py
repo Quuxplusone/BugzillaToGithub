@@ -12,8 +12,7 @@ import xmltodict
 
 def link_to_original_bugzilla_bug(bugzilla_id, text=None):
     assert type(bugzilla_id) is str
-    if text is None:
-        text = 'PR' + bugzilla_id
+    text = text or ('PR' + bugzilla_id)
     return '[%s](https://bugs.llvm.org/show_bug.cgi?id=%s)' % (text, bugzilla_id)
 
 
@@ -24,15 +23,18 @@ def link_to_pr(bugzilla_id, text=None):
 
 
 def link_to_svn_commit(svn_commit_id, text=None):
-    if text is None:
-        text = 'rL' + svn_commit_id
+    text = text or ('rL' + svn_commit_id)
     return '[%s](https://reviews.llvm.org/rL%s)' % (text, svn_commit_id)
 
 
 def link_to_git_commit(git_commit_id, text=None):
-    if text is None:
-        text = 'rG' + git_commit_id
+    text = text or ('rG' + git_commit_id)
     return '[%s](https://reviews.llvm.org/rG%s)' % (text, git_commit_id)
+
+
+def link_to_differential(differential_id, text=None):
+    text = text or ('D' + differential_id)
+    return '[%s](https://reviews.llvm.org/D%s)' % (text, differential_id)
 
 
 def replace_all_in_string(text, rx, how):
@@ -79,18 +81,23 @@ def link_to_mentioned_bugs_and_commits(text):
     )
     text = replace_all_in_string(
         text,
-        r'[^_A-Za-z0-9/](rL[23][0-9]{5})\b',
+        r'[^_A-Za-z0-9/](rL[123][0-9]{5})\b',
         lambda m: link_to_svn_commit(m.group(1)[2:], m.group(1))
     )
     text = replace_all_in_string(
         text,
-        r'[^_A-Za-z0-9/](r[23][0-9]{5})\b',
+        r'[^_A-Za-z0-9/](r[123][0-9]{5})\b',
         lambda m: link_to_svn_commit(m.group(1)[1:], m.group(1))
     )
     text = replace_all_in_string(
         text,
         r'[^_A-Za-z0-9/](rG[0-9a-f]{7,40})\b',
         lambda m: link_to_git_commit(m.group(1)[2:], m.group(1))
+    )
+    text = replace_all_in_string(
+        text,
+        r'[^_A-Za-z0-9/](D[0-9]{4,6})\b',
+        lambda m: link_to_differential(m.group(1)[1:], m.group(1))
     )
     return text
 
@@ -145,6 +152,9 @@ def markdownify(text):
     if ('```\n' in text) or (' `' in text and '` ' in text):
         # Text containing backticks is probably fine as Markdown.
         return link_to_mentioned_bugs_and_commits(text)
+    if (text.count('\n') == 2 * text.count('\n\n')) and ('*' not in text):
+        # If every line is a new paragraph, it's probably fine as Markdown.
+        return link_to_mentioned_bugs_and_commits(text)
     if '\n' in text:
         # Monospace all multiline text, e.g. clang-format bug reports.
         # Bugzilla breaks lines around 84 columns; we choose 80.
@@ -156,26 +166,31 @@ def markdownify(text):
 
 
 def link_to_pr_if_possible(s):
-    m = re.match(r'^([0-9]+)$', s)
-    if m:
+    m = (
+        re.match(r'^([0-9]+)$', s) or
+        re.match(r'^PR([0-9]+)$', s) or
+        re.match(r'^https://bugs.llvm.org//show_bug.cgi[?]id=([0-9]+)$', s) or
+        re.match(r'^https://bugs.llvm.org/show_bug.cgi[?]id=([0-9]+)$', s) or
+        re.match(r'^http://bugs.llvm.org/show_bug.cgi[?]id=([0-9]+)$', s) or
+        re.match(r'^https://llvm.org/bugs/show_bug.cgi[?]id=([0-9]+)$', s) or
+        re.match(r'^http://llvm.org/bugs/show_bug.cgi[?]id=([0-9]+)$', s) or
+        None
+    )
+    if m is not None:
         return link_to_pr(m.group(1))
-    m = re.match(r'^PR([0-9]+)$', s)
-    if m:
-        return link_to_pr(m.group(1))
-    m = re.match(r'^https://bugs.llvm.org/show_bug.cgi?id=([0-9]+)$', s)
-    if m:
-        return link_to_pr(m.group(1))
+    # I've manually verified that all these external links look reasonable.
+    assert s.startswith('http') and ('llvm' not in s), s
     return markdownify(s)
 
 
 def link_to_commit_if_possible(s):
-    m = re.match(r'^r?([23][0-9]{5})$', s)
+    m = re.match(r'^r?([123][0-9]{5})$', s)
     if m:
         return link_to_svn_commit(m.group(1))
-    m = re.match(r'^rL([23][0-9]{5})$', s)
+    m = re.match(r'^rL([123][0-9]{4,5})$', s)
     if m:
         return link_to_svn_commit(m.group(1))
-    m = re.match(r'^https://reviews.llvm.org/rL([23][0-9]{5})$', s)
+    m = re.match(r'^https://reviews.llvm.org/rL([123][0-9]{4,5})$', s)
     if m:
         return link_to_svn_commit(m.group(1))
     m = re.match(r'^([0-9a-f]+)$', s)
@@ -302,7 +317,8 @@ def generate_summary_table(bz):
 
 
 def detect_bugzilla_autocomment(text):
-    if not text.strip().endswith('***'):
+    text = text.lstrip('\n').rstrip()
+    if not text.endswith('***'):
         return (text, '')
     partition_point = None
     m1 = re.search(r'\*\*\* This bug has been marked as a duplicate of bug \d+ \*\*\*', text)
@@ -323,7 +339,7 @@ def detect_bugzilla_autocomment(text):
 
 
 def to_github_comment(c):
-    bodytext, autocomment = detect_bugzilla_autocomment(c['thetext'].lstrip('\n').rstrip() or '')
+    bodytext, autocomment = detect_bugzilla_autocomment(c['thetext'] or '')
     bodytext = markdownify(bodytext)
     if bodytext and autocomment:
         bodytext = bodytext.strip() + '\n\n'

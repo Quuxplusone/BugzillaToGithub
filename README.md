@@ -40,8 +40,8 @@ what's being thrown out.
 
     ./xml-to-json.py
 
-This will take about three minutes to produce 51567 JSON files,
-totaling 342MB of disk space.
+This will take about seven minutes to produce 51567 JSON files,
+totaling 349MB of disk space.
 
 The resulting JSON files use a schema that's roughly the same
 as the one you get by exporting from GitHub's
