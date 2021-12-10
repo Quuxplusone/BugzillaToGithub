@@ -244,6 +244,7 @@ def generate_summary_table(bz):
         '| Fixed by commit(s) | %s |',
         '| Attachments        | %s |',
         '| Blocks             | %s |',
+        '| Blocked by         | %s |',
         '| See also           | %s |',
     ])
     return summary % (
@@ -259,6 +260,7 @@ def generate_summary_table(bz):
         fixed_by_commits,
         '<br/>'.join([to_human_readable_attachment(a) for a in repeated_element(bz, 'attachment')]),
         ', '.join([link_to_pr_if_possible(s) for s in repeated_element(bz, 'blocked')]),
+        ', '.join([link_to_pr_if_possible(s) for s in repeated_element(bz, 'dependson')]),
         ', '.join([link_to_pr_if_possible(s) for s in repeated_element(bz, 'see_also')]),
     )
 
