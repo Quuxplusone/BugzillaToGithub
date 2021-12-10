@@ -111,6 +111,35 @@ def link_to_mentioned_bugs_in_bugzilla_autocomment(text):
     return text
 
 
+def wrap_long_line(line):
+    line = line.rstrip()
+    if (len(line) <= 80) or (' ' not in line) or (line[0] == ' '):
+        # Don't wrap lines that look like probably source code.
+        return line
+    lastspace = line.rfind(' ', 0, 80)
+    lasthyphen = line.rfind('-', 0, 80)
+    if lastspace > lasthyphen:
+        return line[:lastspace].rstrip() + '\n' + wrap_long_line(line[lastspace:].lstrip())
+    elif lasthyphen > lastspace:
+        return line[:lasthyphen+1] + '\n' + wrap_long_line(line[lasthyphen+1:])
+    else:
+        assert lastspace == -1 and lasthyphen == -1
+        lastspace = line.find(' ', 80)
+        lasthyphen = line.find('-', 80)
+        assert lastspace != -1
+        if lasthyphen != -1 and lasthyphen < lastspace:
+            return line[:lasthyphen+1] + '\n' + wrap_long_line(line[lasthyphen+1:])
+        else:
+            return line[:lastspace].rstrip() + '\n' + wrap_long_line(line[lastspace:].lstrip())
+
+
+def wrap_long_lines(text):
+    text.lstrip('\n')
+    return '\n'.join([
+        wrap_long_line(line) for line in text.split('\n')
+    ])
+
+
 def markdownify(text):
     # TODO FIXME BUG HACK: this should be improved
     if ('```\n' in text) or (' `' in text and '` ' in text):
@@ -118,7 +147,8 @@ def markdownify(text):
         return link_to_mentioned_bugs_and_commits(text)
     if '\n' in text:
         # Monospace all multiline text, e.g. clang-format bug reports.
-        return "```\n" + text.strip() + "\n```\n"
+        # Bugzilla breaks lines around 84 columns; we choose 80.
+        return "```\n" + wrap_long_lines(text) + "\n```\n"
     if '*' in text:
         # Escape stars, which are significant in C and C++.
         return "`" + text + "`"
@@ -287,7 +317,7 @@ def detect_bugzilla_autocomment(text):
 
 
 def to_github_comment(c):
-    bodytext, autocomment = detect_bugzilla_autocomment(c['thetext'].strip() or '')
+    bodytext, autocomment = detect_bugzilla_autocomment(c['thetext'].lstrip('\n').rstrip() or '')
     bodytext = markdownify(bodytext)
     if bodytext and autocomment:
         bodytext = bodytext.strip() + '\n\n'
