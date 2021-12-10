@@ -3,10 +3,22 @@
 ### Step 1: Export your Bugzilla bugs to XML.
 
     mkdir xml/
-    ./bugzilla-to-xml.py
+    BUGZILLA_LOGIN=~~~~ BUGZILLA_LOGINCOOKIE=~~~~~~~~~~ ./bugzilla-to-xml.py
 
 This will take about 36 hours to fetch 53000 bugs,
 totaling 2.9GB of disk space.
+
+Bugzilla will accept our requests and serve partial data
+even if we do not present a valid `BUGZILLA_LOGINCOOKIE`.
+However, in that case it will strip the domains of email
+addresses (see [this SO question](https://stackoverflow.com/questions/70307092/)).
+If you want email addresses (which you do), you must
+provide your login cookies.
+
+This step is repeatable, but it takes a very long time.
+You can parallelize it by running copies of the script with
+different ranges of `(FIRST_BUGZILLA_NUMBER, LAST_BUGZILLA_NUMBER)`,
+all writing into the same `xml/` directory.
 
 
 ### Step 2: Discard non-existent bug numbers.
