@@ -148,11 +148,15 @@ def wrap_long_lines(text):
 
 
 def any_line_looks_like_code(text):
+    if ('\n\n ' in text):
+        # This looks like hand-indented code.
+        return True
     if '*' in text:
         # Markdown definitely can't handle asterisks.
         return True
-    if ('\n\n ' in text):
-        # This looks like hand-indented code.
+    if re.match(r'<[a-zA-Z]*>', text):
+        # Markdown treats <S> as strikethrough; e.g. bug 12092.
+        # Let's just monospace all HTML tags.
         return True
     return False
 
