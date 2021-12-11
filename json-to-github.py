@@ -5,6 +5,7 @@ import json
 import os
 import re
 import requests
+import subprocess
 import time
 
 
@@ -24,16 +25,31 @@ LAST_BUGZILLA_ID = 10000
 
 def submit_github_issue(payload):
     assert re.match(r'[A-Za-z0-9_-]+/[A-Za-z0-9_-]+', GITHUB_REPOSITORY_NAME)
-    r = requests.post(
-        'https://api.github.com/repos/%s/import/issues' % GITHUB_REPOSITORY_NAME,
-        headers={
-            'Authorization': 'token %s' % GITHUB_API_TOKEN,
-        },
-        data=json.dumps(payload)
-    )
-    assert r.status_code != 401, 'ERROR -- HTTP 401 Unauthorized -- is your API token expired or misspelled?'
-    assert r.status_code == 202, 'Expected HTTP 202 Accepted, not HTTP %d: %s' % (r.status_code, r.text)
-    print(r.text)
+    if False:
+        # requests.post waits for each server response before continuing, which
+        # means you can do only about 1 request per second. This alternative
+        # approach can send POST requests vastly faster... but merely succeeds
+        # in triggering GitHub's "secondary rate limit", which means the issues
+        # get rejected instead of imported. Preserved for historical interest.
+        # https://docs.github.com/en/free-pro-team@latest/rest/overview/resources-in-the-rest-api#secondary-rate-limits
+        subprocess.Popen([
+            'curl',
+            '-X', 'POST',
+            '-H', 'Authorization: token %s' % GITHUB_API_TOKEN,
+            '-d', json.dumps(payload),
+            'https://api.github.com/repos/%s/import/issues' % GITHUB_REPOSITORY_NAME,
+        ])
+    else:
+        r = requests.post(
+            'https://api.github.com/repos/%s/import/issues' % GITHUB_REPOSITORY_NAME,
+            headers={
+                'Authorization': 'token %s' % GITHUB_API_TOKEN,
+            },
+            data=json.dumps(payload),
+        )
+        assert r.status_code != 401, 'ERROR -- HTTP 401 Unauthorized -- is your API token expired or misspelled?'
+        assert r.status_code == 202, 'Expected HTTP 202 Accepted, not HTTP %d: %s' % (r.status_code, r.text)
+        print(r.text)
 
 
 def bugzilla_to_github_user(username):
@@ -66,7 +82,10 @@ def dumb_down_issue(gh):
             "closed": (gh['issue']['state'] == 'closed'),
             "labels": [tag['name'] for tag in gh['issue']['labels']],
         },
-        "comments": [dumb_down_comment(c) for c in gh['comments']]
+        "comments": [
+            # GitHub rejects (and Bugzilla hides) comments with no body text.
+            dumb_down_comment(c) for c in gh['comments'] if c['body']
+        ]
     }
 
 
