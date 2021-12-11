@@ -391,7 +391,9 @@ def bugzilla_to_github(id, bz):
         # Eliminate boring Bugzilla-generated comments in favor of our custom attachment comments.
         boring_body = 'Created attachment %s' % a['attachid']
         attachment_comment = to_github_attachment_comment(a)
-        comments = [c for c in comments if c['body'] != boring_body] + [attachment_comment]
+        comments = [
+            c for c in comments if boring_body not in c['body']
+        ] + [attachment_comment]
     comments.sort(key=lambda c: c['updated_at'])
 
     return {
