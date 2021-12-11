@@ -74,6 +74,8 @@ This last step is irreversible! It increments the issue numbers on the GitHub re
 point it at. There is no way to "decrement and try again," except to delete the entire
 repo and re-create it.
 
+This will take about 17 hours to upload 51567 issues to GitHub.
+
 
 ### Further reading
 
