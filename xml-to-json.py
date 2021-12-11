@@ -119,6 +119,7 @@ def link_to_mentioned_bugs_in_bugzilla_autocomment(text):
 
 
 def wrap_long_line(line):
+    # Bugzilla breaks lines around 84 columns; we choose 80.
     line = line.rstrip()
     if (len(line) <= 80) or (' ' not in line) or (line[0] == ' '):
         # Don't wrap lines that look like probably source code.
@@ -141,10 +142,19 @@ def wrap_long_line(line):
 
 
 def wrap_long_lines(text):
-    text.lstrip('\n')
     return '\n'.join([
         wrap_long_line(line) for line in text.split('\n')
     ])
+
+
+def any_line_looks_like_code(text):
+    if '*' in text:
+        # Markdown definitely can't handle asterisks.
+        return True
+    if ('\n\n ' in text):
+        # This looks like hand-indented code.
+        return True
+    return False
 
 
 def markdownify(text):
@@ -152,16 +162,15 @@ def markdownify(text):
     if ('```\n' in text) or (' `' in text and '` ' in text):
         # Text containing backticks is probably fine as Markdown.
         return link_to_mentioned_bugs_and_commits(text)
-    if (text.count('\n') == 2 * text.count('\n\n')) and ('*' not in text):
-        # If every line is a new paragraph, it's probably fine as Markdown.
-        return link_to_mentioned_bugs_and_commits(text)
-    if '\n' in text:
-        # Monospace all multiline text, e.g. clang-format bug reports.
-        # Bugzilla breaks lines around 84 columns; we choose 80.
+    if any_line_looks_like_code(text) or (text.count('\n') != 2 * text.count('\n\n')):
+        # Monospace all text that looks like code.
+        # Also monospace any text containing hand-broken lines within a
+        # paragraph (that is, non-doubled newline characters), even if it
+        # doesn't look like code to us.
+        # This is important for clang-format bug reports.
         return "```\n" + wrap_long_lines(text) + "\n```\n"
-    if '*' in text:
-        # Escape stars, which are significant in C and C++.
-        return "`" + text + "`"
+    # If it doesn't contain code, and every line is its own
+    # paragraph, then it's probably fine as Markdown.
     return link_to_mentioned_bugs_and_commits(text)
 
 
