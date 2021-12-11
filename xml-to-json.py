@@ -396,6 +396,10 @@ def bugzilla_to_github(id, bz):
         ] + [attachment_comment]
     comments.sort(key=lambda c: c['updated_at'])
 
+    # TODO FIXME BUG HACK: 23 bugs set bz['alias'] to a short human-readable alias,
+    # such as "release-13.0.0" (bug 51236) or "poor-debug-experiences" (bug 38768).
+    # Should we reflect this in the JSON somehow?
+
     return {
         "issue": {
             "number": bz['bug_id'],
