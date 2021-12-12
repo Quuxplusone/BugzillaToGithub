@@ -11,7 +11,7 @@ import time
 # ("Full control of private repositories"), and store it in GITHUB_API_TOKEN below.
 # Do not publish this API token! Do not push it to GitHub!
 
-GITHUB_REPOSITORY_NAME = 'llvm/llvm-bugzilla-archive'
+GITHUB_REPOSITORY_NAME = 'llvm/llvm-project'
 GITHUB_API_TOKEN = os.environ.get('GITHUB_API_TOKEN', None)
 
 
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         if GITHUB_API_TOKEN is not None:
             headers['Authorization'] = 'token %s' % GITHUB_API_TOKEN
         r = requests.get(
-            'https://api.github.com/repos/%s/issues?page=%d&per_page=100' % (GITHUB_REPOSITORY_NAME, page + 1),
+            'https://api.github.com/repos/%s/issues?state=all&page=%d&per_page=100' % (GITHUB_REPOSITORY_NAME, page + 1),
             headers=headers,
         )
         assert_status_code(r)
@@ -132,6 +132,7 @@ if __name__ == '__main__':
                 print('WARNING -- bug without number on page %d!!' % page)
             else:
                 id = issue['number']
+                print('Fetching issue %d' % id)
                 bug = {
                     "issue": issue,
                     "comments": []
