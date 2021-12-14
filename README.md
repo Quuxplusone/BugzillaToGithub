@@ -79,6 +79,10 @@ This will take about 17 hours to upload 51567 issues to GitHub.
 
 ### Further reading
 
+For my blog post with more information about this repo, see
+
+* ["I sweded the LLVM Bugzilla migration"](https://quuxplusone.github.io/blog/2021/12/11/llvm-bugzilla-fan-edit/) (2021-12-11)
+
 For other GitHub Issues API scripts, see
 
 * [erikmd/github-issues-import-api-tools](https://github.com/erikmd/github-issues-import-api-tools) (2018)
