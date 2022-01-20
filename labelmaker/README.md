@@ -50,4 +50,6 @@ whose API token you use.
 
 This last step is for real! It applies actions to the repository on GitHub.
 
-This will take about 3 hours to upload all 8020 updates to GitHub.
+This will take about 45 minutes to apply all 2511 updates to GitHub.
+(There are only 2511 updates, not 8293, because it turns out that most
+of the `invalid` and `duplicate` bugs are already marked correctly.)
