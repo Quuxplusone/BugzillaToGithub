@@ -10,9 +10,9 @@
 (This is the same as in `../README.md`.)
 
 
-### Step 3: Process each XML bug to extract resolutions.
+### Step 3: Process each XML bug to extract those with CONFIRMED status.
 
-    ./xml-to-bz-map.py
+    ./labelmaker/xml-to-bz-map.py
 
 This will take about 1 minute, and will print a Python dict
 named `bz_resolution_map`. Cut and paste that Python dict
@@ -23,22 +23,28 @@ into the top of `bz-map-to-gh-map.py`.
 
 After editing `bz-map-to-gh-map.py` in Step 3, run it:
 
+    cd labelmaker
     ./bz-map-to-gh-map.py
 
-This will take about 5.5 hours to fetch all 8293 bug numbers, and then
+This will take about an hour to fetch all 974 bug numbers, and then
 it will print a Python dict named `gh_resolution_map`. Cut and paste
+that Python dict into the top of `exclude-already-closed-gh-issues.py`.
+
+
+### Step 5: Filter out GitHub issues that have already been closed.
+
+After editing `exclude-already-closed-gh-issues.py` in Step 4, run it:
+
+    ./exclude-already-closed-gh-issues.py
+
+It will print a Python list named `issues_to_mark_confirmed`. Cut and paste
 that Python dict into the top of `gh-map-to-github.py`.
 
 
-### Step 5: Apply labels to GitHub.
+### Step 6: Apply labels to GitHub.
 
-The following script will apply these four labels: `invalid`, `wontfix`,
-`duplicate`, `worksforme`.
-
-It will *not* apply `later`, `remind`, or `moved`. (Nor `fixed`, because
-on GitHub that's indicated by simply closing the issue.) But if we
-want to apply `later`, `remind`, or `moved`, we've already got the data
-from the previous steps and therefore only have to repeat this one.
+The following script will apply the `confirmed` label to all the
+issues mentioned in the previous step.
 
 We must provide a GitHub "Personal API Token" (which you can generate
 [here](https://github.com/settings/tokens/new) if you're logged into
@@ -50,6 +56,4 @@ whose API token you use.
 
 This last step is for real! It applies actions to the repository on GitHub.
 
-This will take about 45 minutes to apply all 2511 updates to GitHub.
-(There are only 2511 updates, not 8293, because it turns out that most
-of the `invalid` and `duplicate` bugs are already marked correctly.)
+This will take about 20 minutes to apply all 974 updates to GitHub.
